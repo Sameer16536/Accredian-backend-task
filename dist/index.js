@@ -29,27 +29,28 @@ app.post('/referral', (req, res) => __awaiter(void 0, void 0, void 0, function* 
     if (!success) {
         return res.status(400).json({ message: "Invalid Input" });
     }
-    const { email, username, referralCode, referrerEmail } = req.body;
+    const { email, username, referralCode, referreeEmail } = req.body;
     try {
-        let referrer;
-        if (referralCode) {
-            referrer = yield prisma.referrer.findUnique({ where: { referralCode } });
-        }
-        else {
-            referrer = yield prisma.referrer.findUnique({ where: { email: referrerEmail } });
-        }
+        const referrer = yield prisma.referrer.findUnique({ where: { email } });
         if (!referrer) {
-            return res.status(404).json({ error: 'Referrer not found' });
+            return res.status(400).json({ message: "Invalid Referrer" });
         }
-        const referree = yield prisma.referree.create({
-            data: {
-                email,
-                username,
-                referredBy: referrer.id,
-            },
-        });
-        yield (0, email_1.sendReferralEmail)(email, username, referrer.email);
-        res.status(201).json(referree);
+        if (referreeEmail) {
+            const referree = yield prisma.referree.findUnique({ where: { email: referreeEmail } });
+            if (referree) {
+                yield (0, email_1.sendReferralEmail)(email, username, referrer.email);
+                res.status(201).json(referree);
+            }
+            const receiver = yield prisma.referree.create({
+                data: {
+                    email,
+                    username,
+                    referredBy: referrer.id,
+                },
+            });
+            yield (0, email_1.sendReferralEmail)(email, username, referrer.email);
+            res.status(201).json(receiver);
+        }
     }
     catch (error) {
         res.status(500).json({ error: 'Internal server error' });
@@ -77,11 +78,7 @@ app.post('/referree', (req, res) => __awaiter(void 0, void 0, void 0, function* 
 app.post('/generatecode', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email } = req.body;
     try {
-        const existingUser = yield prisma.referrer.findUnique({ where: { email } });
-        if (!existingUser) {
-            return res.json({ error: "User not found" });
-        }
-        const code = (0, util_1.generateReferralCode)(existingUser.email);
+        const code = (0, util_1.generateReferralCode)(email);
         return res.json({
             referralCode: code
         });

@@ -5,12 +5,12 @@ import readline from 'readline';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
 const TOKEN_PATH = 'token.json';
 
-export function sendReferralEmail(to: string, username: string, referrerEmail: string) {
+export function sendReferralEmail(to: string, username: string, referrerEmail: string,referralCode:string) {
   return new Promise<void>((resolve, reject) => {
     fs.readFile('credentials.json', (err, content) => {
       if (err) return reject('Error loading client secret file:' + err);
       authorize(JSON.parse(content.toString()), auth => {
-        sendEmail(auth, to, username, referrerEmail)
+        sendEmail(auth, to, username, referrerEmail,referralCode)
         .then(() => resolve())
         
         .catch(reject);
@@ -54,16 +54,18 @@ function getNewToken(oAuth2Client: any, callback: (auth: any) => void) {
   });
 }
 
-function sendEmail(auth: any, to: string, username: string, referrerEmail: string) {
+function sendEmail(auth: any, to: string, username: string, referrerEmail: string,referralCode:string) {
   const gmail = google.gmail({ version: 'v1', auth });
 
   const email = `
-    From: "Your Name" <your.email@example.com>
+    From: "" <your.email@example.com>
     To: ${to}
     Subject: Referral Invitation
     Content-Type: text/plain; charset="UTF-8"
 
     Hi ${username},
+
+    ${referralCode}
 
     I would like to refer you to this amazing platform. Please check it out!
 
