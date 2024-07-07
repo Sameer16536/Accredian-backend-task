@@ -33,24 +33,25 @@ app.post('/referral', (req, res) => __awaiter(void 0, void 0, void 0, function* 
     console.log(req.body);
     console.log(email, username, referralCode, referreeEmail);
     try {
-        const referrer = yield prisma.referrer.findUnique({ where: { email } });
-        if (!referrer) {
-            return res.status(400).json({ message: "Invalid Referrer" });
+        // Check if the referree already exists in the database
+        const existingReferree = yield prisma.referree.findUnique({ where: { email: referreeEmail } });
+        if (existingReferree) {
+            return res.status(400).json({ message: "You cannot refer another person" });
         }
-        const referree = yield prisma.referree.findUnique({ where: { email: referreeEmail } });
-        if (!referree) {
-            const receiver = yield prisma.referree.create({
-                data: {
-                    email: referreeEmail, // Make sure you save the referree's email
-                    referredBy: referrer.id,
-                    username,
-                },
-            });
-            res.status(201).json(receiver);
-        }
+        // Create a new referree entry
+        const newReferree = yield prisma.referree.create({
+            data: {
+                email: referreeEmail,
+                referredBy: email, // Assuming 'email' is the referrer's email
+                username,
+            },
+        });
+        // Send the referral email
         yield (0, authorize_1.sendMail)(referreeEmail, username, email, referralCode);
+        res.status(201).json(newReferree);
     }
     catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Internal server error' });
     }
 }));
