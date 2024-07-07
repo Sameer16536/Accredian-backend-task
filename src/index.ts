@@ -22,38 +22,35 @@ app.post('/referral', async (req, res) => {
 
   const { email, username, referralCode, referreeEmail } = req.body;
   console.log(req.body);
-  console.log(email, username, referralCode, referreeEmail)
+  console.log(email, username, referralCode, referreeEmail);
+  
   try {
-    const referrer = await prisma.referrer.findUnique({ where: { email } });
-    if (!referrer) {
-      return res.status(400).json({ message: "Invalid Referrer" });
+    // Check if the referree already exists in the database
+    const existingReferree = await prisma.referree.findUnique({ where: { email: referreeEmail } });
+    
+    if (existingReferree) {
+      return res.status(400).json({ message: "You cannot refer another person" });
     }
 
-    const referree = await prisma.referree.findUnique({ where: { email: referreeEmail } })
-    if (!referree) {
-      const receiver = await prisma.referree.create({
-        data: {
-          email: referreeEmail, // Make sure you save the referree's email
-          referredBy: referrer.id,
-          username,
-        },
-      });
+    // Create a new referree entry
+    const newReferree = await prisma.referree.create({
+      data: {
+        email: referreeEmail,
+        referredBy: email,  // Assuming 'email' is the referrer's email
+        username,
+      },
+    });
 
-      res.status(201).json(receiver);
-    }
-
-
+    // Send the referral email
     await sendMail(referreeEmail, username, email, referralCode);
 
-
-
-
-
-
+    res.status(201).json(newReferree);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 
 //Enter email , enter referral code
