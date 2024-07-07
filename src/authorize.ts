@@ -1,92 +1,43 @@
-// import fs from 'fs';
-// import readline from 'readline';
-// import { google } from 'googleapis';
+import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
+import dotenv from 'dotenv';
 
-// const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
-// const TOKEN_PATH = 'token.json';
+dotenv.config();
 
-// // Load client secrets from a local file.
-// fs.readFile('credentials.json', (err, content) => {
-//   if (err) {
-//     console.log('Error loading client secret file:', err);
-//     return;
-//   }
-//   // Authorize a client with credentials, then call the Gmail API.
-//   authorize(JSON.parse(content.toString()), listLabels);
-// });
+const CLIENT_ID = process.env.CLIENT_ID!;
+const CLIENT_SECRET = process.env.CLIENT_SECRET!;
+const REDIRECT_URI = process.env.REDIRECT_URI!;
+const REFRESH_TOKEN = process.env.REFRESH_TOKEN!;
 
-// /**
-//  * Create an OAuth2 client with the given credentials, and then execute the given callback function.
-//  * @param {Object} credentials The authorization client credentials.
-//  * @param {function} callback The callback to call with the authorized client.
-//  */
-// function authorize(credentials: any, callback: any) {
-//   const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
-//   if (!client_secret || !client_id || !redirect_uris) {
-//     console.error('Error: credentials file does not have the required properties.');
-//     return;
-//   }
+const OAuth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+OAuth2.setCredentials({ refresh_token: REFRESH_TOKEN });
 
-//   const oAuth2Client = new google.auth.OAuth2(
-//     client_id, client_secret, redirect_uris[0]);
+export const sendMail = async (to: string, username: string, referrerEmail: string, referralCode: string) => {
+  try {
+    const accessToken = await OAuth2.getAccessToken();
+    const transport = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        type: 'OAuth2',
+        user: 'sameermarathe15@gmail.com',
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        refreshToken: REFRESH_TOKEN,
+        accessToken: accessToken.token,
+      },
+    } as nodemailer.TransportOptions);
 
-//   // Check if we have previously stored a token.
-//   fs.readFile(TOKEN_PATH, (err, token) => {
-//     if (err) return getNewToken(oAuth2Client, callback);
-//     oAuth2Client.setCredentials(JSON.parse(token.toString()));
-//     callback(oAuth2Client);
-//   });
-// }
+    const mailOptions = {
+      from: 'sameermarathe15@gmail.com',
+      to: to,
+      subject: 'Referral Code',
+      text: `Hello from ${username},\n\nYour referral code is ${referralCode}.\n\nPlease share this code with your friends and family to earn some extra cash.\n\nRegards,\n${referrerEmail}`,
+    };
 
-// /**
-//  * Get and store new token after prompting for user authorization, and then execute the given callback with the authorized OAuth2 client.
-//  * @param {google.auth.OAuth2} oAuth2Client The OAuth2 client to get token for.
-//  * @param {getEventsCallback} callback The callback for the authorized client.
-//  */
-// function getNewToken(oAuth2Client: any, callback: any) {
-//   const authUrl = oAuth2Client.generateAuthUrl({
-//     access_type: 'offline',
-//     scope: SCOPES,
-//   });
-//   console.log('Authorize this app by visiting this url:', authUrl);
-//   const rl = readline.createInterface({
-//     input: process.stdin,
-//     output: process.stdout,
-//   });
-//   rl.question('Enter the code from that page here: ', (code: string) => {
-//     rl.close();
-//     oAuth2Client.getToken(code, (err: any, token: any) => {
-//       if (err) return console.error('Error retrieving access token', err);
-//       oAuth2Client.setCredentials(token);
-//       // Store the token to disk for later program executions
-//       fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-//         if (err) return console.error(err);
-//         console.log('Token stored to', TOKEN_PATH);
-//       });
-//       callback(oAuth2Client);
-//     });
-//   });
-// }
-
-// /**
-//  * Lists the labels in the user's account.
-//  *
-//  * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
-//  */
-// function listLabels(auth: any) {
-//   const gmail = google.gmail({ version: 'v1', auth });
-//   gmail.users.labels.list({
-//     userId: 'me',
-//   }, (err: any, res: any) => {
-//     if (err) return console.log('The API returned an error: ' + err);
-//     const labels = res.data.labels;
-//     if (labels.length) {
-//       console.log('Labels:');
-//       labels.forEach((label: any) => {
-//         console.log(`- ${label.name}`);
-//       });
-//     } else {
-//       console.log('No labels found.');
-//     }
-//   });
-// }
+    const result = await transport.sendMail(mailOptions);
+    return result;
+  } catch (error) {
+    console.error('Error while sending email:', error);
+    throw new Error('Failed to send email');
+  }
+};

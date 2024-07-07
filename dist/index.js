@@ -15,11 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const client_1 = require("@prisma/client");
-const email_1 = require("./email");
 const prisma = new client_1.PrismaClient();
 const inputs_1 = require("@sameer11/inputs");
 const util_1 = require("./util");
 const cors_1 = __importDefault(require("cors"));
+const authorize_1 = require("./authorize");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(body_parser_1.default.json());
@@ -30,27 +30,25 @@ app.post('/referral', (req, res) => __awaiter(void 0, void 0, void 0, function* 
         return res.status(400).json({ message: "Invalid Input" });
     }
     const { email, username, referralCode, referreeEmail } = req.body;
+    console.log(req.body);
+    console.log(email, username, referralCode, referreeEmail);
     try {
         const referrer = yield prisma.referrer.findUnique({ where: { email } });
         if (!referrer) {
             return res.status(400).json({ message: "Invalid Referrer" });
         }
-        if (referreeEmail) {
-            const referree = yield prisma.referree.findUnique({ where: { email: referreeEmail } });
-            if (referree) {
-                yield (0, email_1.sendReferralEmail)(email, username, referrer.email);
-                res.status(201).json(referree);
-            }
+        const referree = yield prisma.referree.findUnique({ where: { email: referreeEmail } });
+        if (!referree) {
             const receiver = yield prisma.referree.create({
                 data: {
-                    email,
-                    username,
+                    email: referreeEmail, // Make sure you save the referree's email
                     referredBy: referrer.id,
+                    username,
                 },
             });
-            yield (0, email_1.sendReferralEmail)(email, username, referrer.email);
             res.status(201).json(receiver);
         }
+        yield (0, authorize_1.sendMail)(referreeEmail, username, email, referralCode);
     }
     catch (error) {
         res.status(500).json({ error: 'Internal server error' });
@@ -64,11 +62,17 @@ app.post('/referree', (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
     const { email, referralCode } = req.body();
     try {
-        if (referralCode) {
-            const code = yield prisma.referrer.findUnique({ where: { referralCode } });
-            if (!code) {
-                return res.status(404).json({ error: "Referral code not found" });
-            }
+        const code = yield prisma.referrer.findUnique({ where: { referralCode } });
+        if (!code) {
+            return res.status(404).json({ error: "Referral code not found" });
+        }
+        else {
+            const referree = yield prisma.referree.create({
+                data: {
+                    email,
+                    referredBy: code.id,
+                }
+            });
         }
     }
     catch (err) {
